@@ -19,7 +19,26 @@ angular.module('yapp')
     $scope.userObj = {};
     $scope.overview = {};
     $scope.eligilityAmount = 0;
+    $scope.report = {};
     
+    $scope.saveData = function(tr, k) {
+      firebase.database().ref('transaction/'+k+'/user/').set(tr.user);
+      firebase.database().ref('transaction/'+k+'/notes/').set(tr.notes);
+      firebase.database().ref('transaction/'+k+'/ts/').set(new Date(tr.dt).getTime());
+    }
+
+    $scope.reportDetails = function(id){
+      if(id === undefined){
+        $scope.report.user = angular.copy($scope.user.id);
+      }
+
+      $scope.report.transactions = [];
+      firebase.database().ref('transaction').orderByChild('user').equalTo($scope.report.user).on('value', function(snap) {
+        $scope.report.transactions = snap.val();
+        $scope.$apply();
+      });
+    };
+
     $scope.currentTime = new Date().getTime();
     $scope.expense = {amount: 1000};
 
@@ -182,8 +201,13 @@ angular.module('yapp')
           $scope.overview.balance = parseInt($scope.expense.amount) + parseInt($scope.overview.balance);
           firebase.database().ref('summary/balance').set($scope.overview.balance);
           
-          $scope.overview.savings = parseInt($scope.expense.amount) + parseInt($scope.overview.savings);
-          firebase.database().ref('summary/savings').set($scope.overview.savings);
+          if ($scope.expense.user === '-1') {
+            $scope.overview.interest = parseInt($scope.expense.amount) + parseInt($scope.overview.interest);
+            firebase.database().ref('summary/interest').set($scope.overview.interest);
+          } else {
+            $scope.overview.savings = parseInt($scope.expense.amount) + parseInt($scope.overview.savings);
+            firebase.database().ref('summary/savings').set($scope.overview.savings);
+          }
           
           $scope.expense.balance = $scope.overview.balance;
           firebase.database().ref('transaction').push($scope.expense);
@@ -195,7 +219,7 @@ angular.module('yapp')
           $.notify("Payment Submitted, waiting for approval", "info");
         }
         
-        $scope.expense = {amount: 500};
+        $scope.expense = {amount: 1000};
         
         $state.go('statement');
         
@@ -204,7 +228,9 @@ angular.module('yapp')
     
     $scope.newloadRequest = function(){
       $scope.loanrequest.ts = new Date().getTime();
-      $scope.loanrequest.req_by = angular.copy($scope.user.id);
+      if(!$scope.user.isAdmin){
+        $scope.loanrequest.req_by = angular.copy($scope.user.id);
+      }
       $scope.loanrequest.approved = [];
       $scope.loanrequest.loan_status = 0;
       firebase.database().ref('loanrequest').push($scope.loanrequest);
@@ -266,6 +292,9 @@ angular.module('yapp')
                 $scope.myloan.totaldue++;
                 vv.ind = $scope.myloan.totaldue;
               });
+          } else {
+            $scope.myloan.outstanding = angular.copy($scope.myloan.amount);
+            $scope.myloan.totalinterest = 0;
           }
       });
     };
